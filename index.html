@@ -24,10 +24,10 @@
             node: document.getElementById('elm'),
             flags: initialState
         });
-        app.ports.save.subscribe(function (state) {
-            // Save game state to localStorage
-            localStorage.setItem('game', state)
-        });
+        // app.ports.save.subscribe(function (state) {
+        //     // Save game state to localStorage
+        //     localStorage.setItem('game', state)
+        // });
 
         // Capture focus
         window.focus();
