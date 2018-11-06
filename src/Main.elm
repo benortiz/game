@@ -33,14 +33,22 @@ type alias Model =
     , money : Float
     , inventory : List Item
     , date : Int
+    , world : List Region
     }
 
 
 type alias Location =
-    ( Geography, Geography )
+    ( Region, Place )
 
 
-type alias Geography =
+type alias Region =
+    { name : String
+    , area : Int
+    , places : List Place
+    }
+
+
+type alias Place =
     { name : String
     , area : Int
     }
@@ -50,40 +58,81 @@ type Item
     = Tool String
 
 
+defaultFarm =
+    [ Place "Tent" 1, Place "Garden" 2 ]
+
+
+defaultTown =
+    [ Place "General Store" 4, Place "Post Office" 4, Place "Residential" 4 ]
+
+
+world =
+    [ Region "Farm" 16 defaultFarm
+    , Region "Town" 32 defaultTown
+    ]
+
+
+findRegion : String -> List Region -> Region
+findRegion regionName rlist =
+    let
+        foundRegion =
+            List.head (List.filter (\e -> e.name == regionName) rlist)
+    in
+    Maybe.withDefault (Region "Nowhere" 0 []) foundRegion
+
+
+findPlace : String -> List Place -> Place
+findPlace placeName pworld =
+    let
+        foundPlace =
+            List.head (List.filter (\p -> p.name == placeName) pworld)
+    in
+    Maybe.withDefault (Place "Nowhere" 0) foundPlace
+
+
+placesInRegion : Region -> List Place
+placesInRegion { places } =
+    places
+
+
+findLocation : String -> String -> List Region -> Location
+findLocation regionName placeName regionList =
+    let
+        foundRegion =
+            findRegion regionName regionList
+
+        foundPlace =
+            findPlace placeName (placesInRegion foundRegion)
+    in
+    ( foundRegion, foundPlace )
+
+
 initial : Model
 initial =
     { actionPoints = 18.0
-    , location = ( Geography "Farm 1" 16, Geography "Tent" 1 )
+    , location = findLocation "Farm" "Tent" world
     , money = 50.0
     , inventory = [ Tool "Shovel" ]
     , date = 0
+    , world = world
     }
 
 
 
 -- Update
-
-
-port save : String -> Cmd msg
-
-
-
+-- port save : String -> Cmd msg
 -- saveToStorage : Model -> ( Model, Cmd Msg )
 -- saveToStorage model =
 --     ( model, save (encode 2 model) )
 
 
 type Msg
-    = SpendPoints Float
-    | Goto Location
+    = Goto Location
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        SpendPoints points ->
-            ( { model | actionPoints = model.actionPoints - points }, Cmd.none )
-
         Goto location ->
             ( { model
                 | actionPoints = model.actionPoints - pointsBetweenLocations model.location location
@@ -93,14 +142,19 @@ update msg model =
             )
 
 
-region : Location -> Geography
-region location =
+regionFromLocation : Location -> Region
+regionFromLocation location =
     first location
+
+
+placeFromLocation : Location -> Place
+placeFromLocation location =
+    second location
 
 
 pointsBetweenLocations : Location -> Location -> Float
 pointsBetweenLocations initialLocation finalLocation =
-    if region initialLocation == region finalLocation then
+    if regionFromLocation initialLocation == regionFromLocation finalLocation then
         0.0
 
     else
@@ -123,13 +177,14 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     div []
-        [ div [] [ text (geographyName (region model.location)) ]
+        [ div [] [ text (regionN (regionFromLocation model.location)) ]
+        , div [] [ text (String.fromFloat model.actionPoints) ]
         , button
-            [ onClick (SpendPoints 0.5) ]
-            [ text "Spend" ]
+            [ onClick (Goto (findLocation "Town" "General Store" model.world)) ]
+            [ text "Go to General Store" ]
         ]
 
 
-geographyName : Geography -> String
-geographyName { name } =
+regionN : Region -> String
+regionN { name } =
     name
