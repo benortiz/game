@@ -7,6 +7,10 @@ import Json.Encode exposing (Value)
 import Tuple exposing (first, second)
 
 
+
+-- Is there a more elm way of handling the 'world' and navigating within it?
+
+
 main =
     Browser.element
         { init = init
@@ -79,6 +83,10 @@ findRegion regionName rlist =
             List.head (List.filter (\e -> e.name == regionName) rlist)
     in
     Maybe.withDefault (Region "Nowhere" 0 []) foundRegion
+
+
+
+-- Can I get rid of these Maybes?
 
 
 findPlace : String -> List Place -> Place
@@ -178,13 +186,55 @@ view : Model -> Html Msg
 view model =
     div []
         [ div [] [ text (regionN (regionFromLocation model.location)) ]
+        , div [] [ text (placeN (placeFromLocation model.location)) ]
         , div [] [ text (String.fromFloat model.actionPoints) ]
         , button
             [ onClick (Goto (findLocation "Town" "General Store" model.world)) ]
             [ text "Go to General Store" ]
+        , renderPlacesAtLocation model.location model.world
+        ]
+
+
+renderPlacesAtLocation : Location -> List Region -> Html Msg
+renderPlacesAtLocation loc wor =
+    let
+        region =
+            regionFromLocation loc
+
+        places =
+            placesInRegion region
+    in
+    recursivelyRenderPlaces places region wor
+
+
+recursivelyRenderPlaces : List Place -> Region -> List Region -> Html Msg
+recursivelyRenderPlaces pl re wo =
+    case pl of
+        [] ->
+            text ""
+
+        place :: places ->
+            div []
+                [ div [] [ renderPlace place re wo ]
+                , div [] [ recursivelyRenderPlaces places re wo ]
+                ]
+
+
+renderPlace : Place -> Region -> List Region -> Html Msg
+renderPlace p r w =
+    div []
+        [ div [] [ text p.name ]
+        , button
+            [ onClick (Goto (findLocation r.name p.name w)) ]
+            [ text ("Go to " ++ p.name) ]
         ]
 
 
 regionN : Region -> String
 regionN { name } =
+    name
+
+
+placeN : Place -> String
+placeN { name } =
     name
