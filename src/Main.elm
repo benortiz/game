@@ -37,12 +37,16 @@ type alias Model =
     , money : Float
     , inventory : List Item
     , date : Int
-    , world : List Region
+    , world : World
     }
 
 
 type alias Location =
     ( Region, Place )
+
+
+type alias World =
+    List Region
 
 
 type alias Region =
@@ -76,7 +80,7 @@ world =
     ]
 
 
-findRegion : String -> List Region -> Region
+findRegion : String -> World -> Region
 findRegion regionName rlist =
     let
         foundRegion =
@@ -103,7 +107,7 @@ placesInRegion { places } =
     places
 
 
-findLocation : String -> String -> List Region -> Location
+findLocation : String -> String -> World -> Location
 findLocation regionName placeName regionList =
     let
         foundRegion =
@@ -185,9 +189,9 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     div []
-        [ div [] [ text (regionN (regionFromLocation model.location)) ]
-        , div [] [ text (placeN (placeFromLocation model.location)) ]
-        , div [] [ text (String.fromFloat model.actionPoints) ]
+        [ div [] [ text ("Current region: " ++ regionN (regionFromLocation model.location)) ]
+        , div [] [ text ("Current place: " ++ placeN (placeFromLocation model.location)) ]
+        , div [] [ text ("Action points: " ++ String.fromFloat model.actionPoints) ]
         , h2 [] [ text "Regions" ]
         , renderOtherRegions model.location model.world
         , h2 [] [ text "Places" ]
@@ -195,24 +199,21 @@ view model =
         ]
 
 
-renderOtherRegions : Location -> List Region -> Html Msg
+renderOtherRegions : Location -> World -> Html Msg
 renderOtherRegions loca worl =
-    case worl of
-        [] ->
-            text ""
-
-        region :: regions ->
-            div []
-                [ if regionFromLocation loca == region then
-                    text ""
-
-                  else
-                    renderRegion region worl
-                , renderOtherRegions loca regions
-                ]
+    renderRegions (List.filter (\r -> r /= regionFromLocation loca) worl) worl
 
 
-renderRegion : Region -> List Region -> Html Msg
+renderRegions : List Region -> World -> Html Msg
+renderRegions regs ww =
+    let
+        regions =
+            List.map (\r -> renderRegion r ww) regs
+    in
+    div [] regions
+
+
+renderRegion : Region -> World -> Html Msg
 renderRegion regi lire =
     div []
         [ div [] [ text regi.name ]
@@ -222,7 +223,7 @@ renderRegion regi lire =
         ]
 
 
-renderPlacesAtLocation : Location -> List Region -> Html Msg
+renderPlacesAtLocation : Location -> World -> Html Msg
 renderPlacesAtLocation loc wor =
     let
         region =
@@ -231,23 +232,19 @@ renderPlacesAtLocation loc wor =
         places =
             placesInRegion region
     in
-    recursivelyRenderPlaces places region wor
+    renderPlaces places region wor
 
 
-recursivelyRenderPlaces : List Place -> Region -> List Region -> Html Msg
-recursivelyRenderPlaces pl re wo =
-    case pl of
-        [] ->
-            text ""
-
-        place :: places ->
-            div []
-                [ renderPlace place re wo
-                , recursivelyRenderPlaces places re wo
-                ]
+renderPlaces : List Place -> Region -> World -> Html Msg
+renderPlaces pl re wo =
+    let
+        places =
+            List.map (\p -> renderPlace p re wo) pl
+    in
+    div [] places
 
 
-renderPlace : Place -> Region -> List Region -> Html Msg
+renderPlace : Place -> Region -> World -> Html Msg
 renderPlace p r w =
     div []
         [ div [] [ text p.name ]
