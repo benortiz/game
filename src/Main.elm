@@ -1,7 +1,7 @@
 port module Game exposing (main)
 
 import Browser
-import Html exposing (Html, button, div, text)
+import Html exposing (Html, button, div, h2, text)
 import Html.Events exposing (onClick)
 import Json.Encode exposing (Value)
 import Tuple exposing (first, second)
@@ -188,10 +188,37 @@ view model =
         [ div [] [ text (regionN (regionFromLocation model.location)) ]
         , div [] [ text (placeN (placeFromLocation model.location)) ]
         , div [] [ text (String.fromFloat model.actionPoints) ]
-        , button
-            [ onClick (Goto (findLocation "Town" "General Store" model.world)) ]
-            [ text "Go to General Store" ]
+        , h2 [] [ text "Regions" ]
+        , renderOtherRegions model.location model.world
+        , h2 [] [ text "Places" ]
         , renderPlacesAtLocation model.location model.world
+        ]
+
+
+renderOtherRegions : Location -> List Region -> Html Msg
+renderOtherRegions loca worl =
+    case worl of
+        [] ->
+            text ""
+
+        region :: regions ->
+            div []
+                [ if regionFromLocation loca == region then
+                    text ""
+
+                  else
+                    renderRegion region worl
+                , renderOtherRegions loca regions
+                ]
+
+
+renderRegion : Region -> List Region -> Html Msg
+renderRegion regi lire =
+    div []
+        [ div [] [ text regi.name ]
+        , button
+            [ onClick (Goto (findLocation regi.name "" lire)) ]
+            [ text ("Go to " ++ regi.name) ]
         ]
 
 
@@ -215,8 +242,8 @@ recursivelyRenderPlaces pl re wo =
 
         place :: places ->
             div []
-                [ div [] [ renderPlace place re wo ]
-                , div [] [ recursivelyRenderPlaces places re wo ]
+                [ renderPlace place re wo
+                , recursivelyRenderPlaces places re wo
                 ]
 
 
