@@ -42,81 +42,48 @@ type alias Model =
 
 
 type alias Location =
-    ( Region, Place )
+    ( Geography, Geography )
 
 
 type alias World =
-    List Region
+    List Geography
 
 
-type alias Region =
+type alias Geography =
     { name : String
     , area : Int
-    , places : List Place
+    , places : SubGeography
     }
 
 
-type alias Place =
-    { name : String
-    , area : Int
-    }
+type SubGeography
+    = SubGeography (List Geography)
 
 
 type Item
     = Tool String
 
 
+emptySubGeography =
+    SubGeography []
+
+
+nowhere =
+    Geography "Nowhere" 0 emptySubGeography
+
+
 defaultFarm =
-    [ Place "Tent" 1, Place "Garden" 2 ]
+    [ Geography "Tent" 1 emptySubGeography, Geography "Garden" 2 emptySubGeography ]
 
 
 defaultTown =
-    [ Place "General Store" 4, Place "Post Office" 4, Place "Residential" 4 ]
+    [ Geography "General Store" 4 emptySubGeography, Geography "Post Office" 4 emptySubGeography, Geography "Residential" 4 emptySubGeography ]
 
 
 world =
-    [ Region "Farm" 16 defaultFarm
-    , Region "Town" 32 defaultTown
+    [ Geography "Farm" 16 (SubGeography defaultFarm)
+    , Geography "Town" 32 (SubGeography defaultTown)
     ]
-
-
-findRegion : String -> World -> Region
-findRegion regionName rlist =
-    let
-        foundRegion =
-            List.head (List.filter (\e -> e.name == regionName) rlist)
-    in
-    Maybe.withDefault (Region "Nowhere" 0 []) foundRegion
-
-
-
--- Can I get rid of these Maybes?
-
-
-findPlace : String -> List Place -> Place
-findPlace placeName pworld =
-    let
-        foundPlace =
-            List.head (List.filter (\p -> p.name == placeName) pworld)
-    in
-    Maybe.withDefault (Place "Nowhere" 0) foundPlace
-
-
-placesInRegion : Region -> List Place
-placesInRegion { places } =
-    places
-
-
-findLocation : String -> String -> World -> Location
-findLocation regionName placeName regionList =
-    let
-        foundRegion =
-            findRegion regionName regionList
-
-        foundPlace =
-            findPlace placeName (placesInRegion foundRegion)
-    in
-    ( foundRegion, foundPlace )
 
 
 initial : Model
@@ -131,11 +98,80 @@ initial =
 
 
 
+-- Locations
+
+
+geographyName : Geography -> String
+geographyName { name } =
+    name
+
+
+unwrapSubGeography : SubGeography -> List Geography
+unwrapSubGeography (SubGeography geographies) =
+    geographies
+
+
+regionFromLocation : Location -> Geography
+regionFromLocation location =
+    first location
+
+
+placeFromLocation : Location -> Geography
+placeFromLocation location =
+    second location
+
+
+placesInRegion : Geography -> SubGeography
+placesInRegion { places } =
+    places
+
+
+otherRegions : Geography -> World -> List Geography
+otherRegions primaryRegion allRegionsInWorld =
+    List.filter (\r -> r /= primaryRegion) allRegionsInWorld
+
+
+pointsBetweenLocations : Location -> Location -> Float
+pointsBetweenLocations initialLocation finalLocation =
+    if regionFromLocation initialLocation == regionFromLocation finalLocation then
+        0.0
+
+    else
+        1.0
+
+
+findRegion : String -> World -> Geography
+findRegion regionName worldToFindRegionIn =
+    let
+        foundRegion =
+            List.head (List.filter (\e -> e.name == regionName) worldToFindRegionIn)
+    in
+    Maybe.withDefault nowhere foundRegion
+
+
+findPlace : String -> SubGeography -> Geography
+findPlace placeName subGeoToFindPlaceIn =
+    let
+        foundPlace =
+            List.head (List.filter (\p -> p.name == placeName) (unwrapSubGeography subGeoToFindPlaceIn))
+    in
+    Maybe.withDefault nowhere foundPlace
+
+
+findLocation : String -> String -> World -> Location
+findLocation regionName placeName worldToFindLocationIn =
+    let
+        foundRegion =
+            findRegion regionName worldToFindLocationIn
+
+        foundPlace =
+            findPlace placeName (placesInRegion foundRegion)
+    in
+    ( foundRegion, foundPlace )
+
+
+
 -- Update
--- port save : String -> Cmd msg
--- saveToStorage : Model -> ( Model, Cmd Msg )
--- saveToStorage model =
---     ( model, save (encode 2 model) )
 
 
 type Msg
@@ -154,25 +190,6 @@ update msg model =
             )
 
 
-regionFromLocation : Location -> Region
-regionFromLocation location =
-    first location
-
-
-placeFromLocation : Location -> Place
-placeFromLocation location =
-    second location
-
-
-pointsBetweenLocations : Location -> Location -> Float
-pointsBetweenLocations initialLocation finalLocation =
-    if regionFromLocation initialLocation == regionFromLocation finalLocation then
-        0.0
-
-    else
-        1.0
-
-
 
 -- Subscriptions
 
@@ -189,8 +206,8 @@ subscriptions model =
 view : Model -> Html Msg
 view model =
     div []
-        [ div [] [ text ("Current region: " ++ regionN (regionFromLocation model.location)) ]
-        , div [] [ text ("Current place: " ++ placeN (placeFromLocation model.location)) ]
+        [ div [] [ text ("Current region: " ++ geographyName (regionFromLocation model.location)) ]
+        , div [] [ text ("Current place: " ++ geographyName (placeFromLocation model.location)) ]
         , div [] [ text ("Action points: " ++ String.fromFloat model.actionPoints) ]
         , h2 [] [ text "Regions" ]
         , renderOtherRegions model.location model.world
@@ -200,65 +217,53 @@ view model =
 
 
 renderOtherRegions : Location -> World -> Html Msg
-renderOtherRegions loca worl =
-    renderRegions (List.filter (\r -> r /= regionFromLocation loca) worl) worl
+renderOtherRegions locationToRenderRegions worldToExtractRegionsFrom =
+    renderRegions
+        (otherRegions (regionFromLocation locationToRenderRegions) worldToExtractRegionsFrom)
+        worldToExtractRegionsFrom
 
 
-renderRegions : List Region -> World -> Html Msg
-renderRegions regs ww =
-    let
-        regions =
-            List.map (\r -> renderRegion r ww) regs
-    in
-    div [] regions
+renderRegions : List Geography -> World -> Html Msg
+renderRegions regionsToRender worldToPassToRegionRenderer =
+    div [] (List.map (\r -> renderRegion r worldToPassToRegionRenderer) regionsToRender)
 
 
-renderRegion : Region -> World -> Html Msg
-renderRegion regi lire =
+renderRegion : Geography -> World -> Html Msg
+renderRegion regionToRender worldToFindRegionIn =
     div []
-        [ div [] [ text regi.name ]
+        [ div [] [ text regionToRender.name ]
         , button
-            [ onClick (Goto (findLocation regi.name "" lire)) ]
-            [ text ("Go to " ++ regi.name) ]
+            [ onClick (Goto (findLocation regionToRender.name "" worldToFindRegionIn)) ]
+            [ text ("Go to " ++ regionToRender.name) ]
         ]
 
 
 renderPlacesAtLocation : Location -> World -> Html Msg
-renderPlacesAtLocation loc wor =
+renderPlacesAtLocation locationToRenderPlaces worldToFindLocationIn =
     let
         region =
-            regionFromLocation loc
+            regionFromLocation locationToRenderPlaces
 
         places =
             placesInRegion region
     in
-    renderPlaces places region wor
+    renderPlaces places region worldToFindLocationIn
 
 
-renderPlaces : List Place -> Region -> World -> Html Msg
-renderPlaces pl re wo =
-    let
-        places =
-            List.map (\p -> renderPlace p re wo) pl
-    in
-    div [] places
-
-
-renderPlace : Place -> Region -> World -> Html Msg
-renderPlace p r w =
+renderPlaces : SubGeography -> Geography -> World -> Html Msg
+renderPlaces placesToRender regionContainingPlaces worldToPassToPlaceRenderer =
     div []
-        [ div [] [ text p.name ]
+        (List.map
+            (\p -> renderPlace p regionContainingPlaces worldToPassToPlaceRenderer)
+            (unwrapSubGeography placesToRender)
+        )
+
+
+renderPlace : Geography -> Geography -> World -> Html Msg
+renderPlace placeToRender regionContainingPlace worldToFindPlaceIn =
+    div []
+        [ div [] [ text placeToRender.name ]
         , button
-            [ onClick (Goto (findLocation r.name p.name w)) ]
-            [ text ("Go to " ++ p.name) ]
+            [ onClick (Goto (findLocation regionContainingPlace.name placeToRender.name worldToFindPlaceIn)) ]
+            [ text ("Go to " ++ placeToRender.name) ]
         ]
-
-
-regionN : Region -> String
-regionN { name } =
-    name
-
-
-placeN : Place -> String
-placeN { name } =
-    name
